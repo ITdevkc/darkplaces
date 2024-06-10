@@ -56,6 +56,8 @@ cvar_t prvm_stringdebug = {CF_CLIENT | CF_SERVER, "prvm_stringdebug", "0", "Prin
 
 static double prvm_reuseedicts_always_allow = 0;
 qbool prvm_runawaycheck = true;
+// Set whether loaded from initial load or from save file. Always presume initial load
+qbool prvm_saveload = false;
 
 //============================================================================
 // mempool handling
@@ -1269,6 +1271,22 @@ static void PRVM_ED_EdictSet_f(cmd_state_t *cmd)
 
 /*
 ====================
+PRVM_ED_ParseEdict_OnLoad
+
+Calls PRVM_ED_ParseEdict in escape mode.
+Used for savegames.
+====================
+*/
+const char *PRVM_ED_ParseEdict_OnLoad (prvm_prog_t *prog, const char *data, prvm_edict_t *ent)
+{
+    // Indicate we are loading from a save
+    prvm_saveload = true;
+    data = PRVM_ED_ParseEdict(prog, data, ent);
+    return data;
+}
+
+/*
+====================
 PRVM_ED_ParseEdict
 
 Parses an edict out of the given string, returning the new position
@@ -1322,7 +1340,8 @@ const char *PRVM_ED_ParseEdict (prvm_prog_t *prog, const char *data, prvm_edict_
 		}
 
 	// parse value
-		if (!COM_ParseToken_Simple(&data, false, false, true))
+        	// If loading from a save, unescape characters. Otherwise load them as they are
+		if (!COM_ParseToken_Simple(&data, false, prvm_saveload, true))
 			prog->error_cmd("PRVM_ED_ParseEdict: EOF without closing brace");
 		if (developer_entityparsing.integer)
 			Con_Printf(" \"%s\"\n", com_token);
@@ -1363,7 +1382,10 @@ const char *PRVM_ED_ParseEdict (prvm_prog_t *prog, const char *data, prvm_edict_
 		ent->free = true;
 		ent->freetime = host.realtime;
 	}
-
+	// Done, so assume we are no longer loading from a save file
+	// (If we are, the variable will be reset to true anyways)
+	prvm_saveload = false;
+	
 	return data;
 }
 
